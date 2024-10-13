@@ -1,6 +1,7 @@
 import pandas as pd
-import numpy as np
 from pathlib import Path
+import argparse
+import os
 
 def load_historical_data(file_paths):
 	"""
@@ -40,13 +41,28 @@ def get_weekday_group(weekday, weekday_groups):
 			return group
 	return None
 
-def predict_next_year(historical_data, prediction_period, weekday_groups, holiday_map=None):
+def predict_next_year(file_paths, prediction_period, weekday_groups, holiday_map=None):
 	"""
 	Predict the next year's values based on the historical data and supplied parameters.
+
+	Parameters:
+	- file_paths: List of file paths containing historical time series data
+	- prediction_period: Tuple of start and end date for the prediction (e.g., ('2025-01-01', '2025-12-31'))
+	- weekday_groups: Dictionary specifying how weekdays are grouped (e.g., {'Mon-Thu': [0,1,2,3], 'Friday': [4], 'Saturday': [5], 'Sunday': [6]})
+	- holiday_map: Dictionary of specific dates to be treated as another weekday (optional)
+
+	Returns:
+	- A DataFrame with predicted values for the specified period
 	"""
+	# Load multiple historical data files
+	historical_data = load_historical_data(file_paths)
+
 	predictions = []
 
-	for target_date in pd.date_range(prediction_period[0], prediction_period[1], freq='60T'):
+	# Convert prediction period strings to Timestamps
+	start_date, end_date = pd.Timestamp(prediction_period[0]), pd.Timestamp(prediction_period[1])
+
+	for target_date in pd.date_range(start_date, end_date, freq='60T'):
 
 		# Adjust for holiday mapping if provided
 		weekday = apply_holiday_map(target_date, holiday_map) if holiday_map else target_date.weekday()
@@ -69,33 +85,45 @@ def predict_next_year(historical_data, prediction_period, weekday_groups, holida
 
 	return prediction_df
 
-# Example usage
+def main():
+	# Create an argument parser
+	parser = argparse.ArgumentParser(description='Predict future values based on historical time series data.')
 
-# Get the absolute path to the 'samples/photos' folder relative to the repo root
-repo_root = Path(__file__).parent.parent
+	# Add arguments
+	parser.add_argument('--file_paths', nargs='+', required=True, help='Paths to historical data CSV files.')
+	parser.add_argument('--start_date', required=True, help='Start date for the prediction period (e.g., 2025-01-01).')
+	parser.add_argument('--end_date', required=True, help='End date for the prediction period (e.g., 2025-12-31).')
+	parser.add_argument('--weekday_groups', required=True, help='Weekday groupings (e.g., {"Mon-Thu": [0,1,2,3], "Friday": [4]}).')
+	parser.add_argument('--holiday_map', required=False, help='Optional holiday map (e.g., {"2024-12-25": 5}).', default=None)
 
-# Load multiple historical data files
-# file_paths = [repo_root / 'data/historical_data1.csv', repo_root / 'data/historical_data2.csv']  # Update with actual file paths
-file_paths = [repo_root / 'data/historical_data1.csv']  # Update with actual file paths
-historical_data = load_historical_data(file_paths)
+	# Parse the arguments
+	args = parser.parse_args()
 
-# Define weekday groupings (e.g., Mon-Thu = [0, 1, 2, 3], Friday = [4], Saturday = [5], Sunday = [6])
-weekday_groups = {
-	'Mon-Thu': [0, 1, 2, 3],
-	'Friday': [4],
-	'Saturday': [5],
-	'Sunday': [6]
-}
+	# Convert weekday_groups from string to dictionary
+	weekday_groups = eval(args.weekday_groups)  # Using eval to convert the string to a dictionary. Use with caution.
 
-# Holiday map setup (date -> weekday, e.g., 5 means treating as Saturday)
-holiday_map = {pd.Timestamp('2024-12-25'): 5}  # Treat Christmas as Saturday
+	# Convert holiday_map from string to dictionary (if supplied)
+	holiday_map = eval(args.holiday_map) if args.holiday_map else None
 
-# Predict for next year (2025)
-prediction_period = (pd.Timestamp('2025-01-01'), pd.Timestamp('2025-12-31'))
+	# Define prediction period as tuple
+	prediction_period = (args.start_date, args.end_date)
 
-# Perform prediction
-predicted_data = predict_next_year(historical_data, prediction_period, weekday_groups, holiday_map)
 
-# Display predictions
-# print(predicted_data.head())
-print(predicted_data)
+
+	repo_root = Path(__file__).parent.parent
+	# Prefix the file paths with repo_root
+	file_paths = [os.path.join(repo_root, file_path) for file_path in args.file_paths]
+
+	# Call the prediction function with supplied arguments
+	predicted_data = predict_next_year(
+		file_paths=file_paths,
+		prediction_period=prediction_period,
+		weekday_groups=weekday_groups,
+		holiday_map=holiday_map
+	)
+
+	# Display the first few predictions
+	print(predicted_data.head())
+
+if __name__ == "__main__":
+	main()
