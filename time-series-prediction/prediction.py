@@ -12,12 +12,17 @@ def load_historical_data(file_paths):
 	historical_data = historical_data.sort_index()
 	return historical_data
 
-def find_nearest_comparison_days(target_date, historical_data, num_days=4):
+def find_nearest_comparison_days(target_date, historical_data, group, weekday_groups, num_days=4):
 	"""
 	Find the nearest comparison days for the target date from the historical data.
+	Ensure the comparison days belong to the same group (e.g., Mon-Thu).
 	"""
-	comparison_days = historical_data.loc[(historical_data.index.month == target_date.month) &
-										  (historical_data.index.day == target_date.day)]
+	# Get the days that match the current group (e.g., Mon-Thu)
+	comparison_days = historical_data[historical_data.index.weekday.isin(weekday_groups[group])]
+
+	# Filter by calendar month and day for nearest match
+	comparison_days = comparison_days.loc[(comparison_days.index.month == target_date.month) &
+										  (comparison_days.index.day == target_date.day)]
 
 	# Sort by the absolute difference in years and take the closest `num_days`
 	nearest_days = comparison_days.index.to_series().apply(lambda x: abs((x - target_date).days)).nsmallest(num_days).index
@@ -71,8 +76,8 @@ def predict_next_year(file_paths, prediction_period, weekday_groups, freq, holid
 		# Determine the group for the target date's weekday
 		group = get_weekday_group(weekday, weekday_groups)
 
-		# Find nearest comparison days based on calendar day
-		comparison_days = find_nearest_comparison_days(target_date, historical_data)
+		# Find nearest comparison days based on calendar day and group
+		comparison_days = find_nearest_comparison_days(target_date, historical_data, group, weekday_groups)
 
 		# Take the average of the corresponding interval values from the comparison days
 		comparison_data = historical_data.loc[comparison_days]
@@ -96,7 +101,7 @@ def main():
 	parser.add_argument('--end_date', required=True, help='End date for the prediction period (e.g., 2025-12-31).')
 	parser.add_argument('--weekday_groups', required=True, help='Weekday groupings (e.g., {"Mon-Thu": [0,1,2,3], "Friday": [4]}).')
 	parser.add_argument('--holiday_map', required=False, help='Optional holiday map (e.g., {"2024-12-25": 5}).', default=None)
-	parser.add_argument('--freq', required=False, help='Frequency for prediction intervals (e.g., 15min for 15 minutes, 60min for 1 hour).')
+	parser.add_argument('--freq', required=False, help='Frequency for prediction intervals (e.g., 15T for 15 minutes, 60T for 1 hour).', default='15T')
 
 	# Parse the arguments
 	args = parser.parse_args()
