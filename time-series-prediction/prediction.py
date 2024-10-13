@@ -41,14 +41,15 @@ def get_weekday_group(weekday, weekday_groups):
 			return group
 	return None
 
-def predict_next_year(file_paths, prediction_period, weekday_groups, holiday_map=None):
+def predict_next_year(file_paths, prediction_period, weekday_groups, freq, holiday_map=None):
 	"""
 	Predict the next year's values based on the historical data and supplied parameters.
 
 	Parameters:
 	- file_paths: List of file paths containing historical time series data
 	- prediction_period: Tuple of start and end date for the prediction (e.g., ('2025-01-01', '2025-12-31'))
-	- weekday_groups: Dictionary specifying how weekdays are grouped (e.g., {'Mon-Thu': [0,1,2,3], 'Friday': [4], 'Saturday': [5], 'Sunday': [6]})
+	- weekday_groups: Dictionary specifying how weekdays are grouped
+	- freq: Frequency for prediction intervals (e.g., '15min' for 15 minutes, '60min' for 1 hour)
 	- holiday_map: Dictionary of specific dates to be treated as another weekday (optional)
 
 	Returns:
@@ -62,7 +63,7 @@ def predict_next_year(file_paths, prediction_period, weekday_groups, holiday_map
 	# Convert prediction period strings to Timestamps
 	start_date, end_date = pd.Timestamp(prediction_period[0]), pd.Timestamp(prediction_period[1])
 
-	for target_date in pd.date_range(start_date, end_date, freq='60T'):
+	for target_date in pd.date_range(start_date, end_date, freq=freq):
 
 		# Adjust for holiday mapping if provided
 		weekday = apply_holiday_map(target_date, holiday_map) if holiday_map else target_date.weekday()
@@ -73,7 +74,7 @@ def predict_next_year(file_paths, prediction_period, weekday_groups, holiday_map
 		# Find nearest comparison days based on calendar day
 		comparison_days = find_nearest_comparison_days(target_date, historical_data)
 
-		# Take the average of the corresponding 15-minute values from the comparison days
+		# Take the average of the corresponding interval values from the comparison days
 		comparison_data = historical_data.loc[comparison_days]
 		avg_value = comparison_data[comparison_data.index.time == target_date.time()].mean()
 
@@ -95,6 +96,7 @@ def main():
 	parser.add_argument('--end_date', required=True, help='End date for the prediction period (e.g., 2025-12-31).')
 	parser.add_argument('--weekday_groups', required=True, help='Weekday groupings (e.g., {"Mon-Thu": [0,1,2,3], "Friday": [4]}).')
 	parser.add_argument('--holiday_map', required=False, help='Optional holiday map (e.g., {"2024-12-25": 5}).', default=None)
+	parser.add_argument('--freq', required=False, help='Frequency for prediction intervals (e.g., 15min for 15 minutes, 60min for 1 hour).')
 
 	# Parse the arguments
 	args = parser.parse_args()
@@ -108,8 +110,6 @@ def main():
 	# Define prediction period as tuple
 	prediction_period = (args.start_date, args.end_date)
 
-
-
 	repo_root = Path(__file__).parent.parent
 	# Prefix the file paths with repo_root
 	file_paths = [os.path.join(repo_root, file_path) for file_path in args.file_paths]
@@ -119,6 +119,7 @@ def main():
 		file_paths=file_paths,
 		prediction_period=prediction_period,
 		weekday_groups=weekday_groups,
+		freq=args.freq,
 		holiday_map=holiday_map
 	)
 
