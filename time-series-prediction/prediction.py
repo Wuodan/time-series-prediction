@@ -2,8 +2,9 @@ import pandas as pd
 from pathlib import Path
 import argparse
 import os
+from typing import List, Tuple, Dict, Optional
 
-def load_historical_data(file_paths):
+def load_historical_data(file_paths: List[str]) -> pd.DataFrame:
 	"""
 	Load historical time series data from multiple files.
 	Each file should contain a time-indexed DataFrame.
@@ -12,7 +13,7 @@ def load_historical_data(file_paths):
 	historical_data = historical_data.sort_index()
 	return historical_data
 
-def find_nearest_comparison_days(target_date, historical_data, group, weekday_groups, num_days=4):
+def find_nearest_comparison_days(target_date: pd.Timestamp, historical_data: pd.DataFrame, group: str, weekday_groups: Dict[str, List[int]], num_days: int = 4) -> pd.Index:
 	"""
 	Find the nearest comparison days for the target date from the historical data.
 	Ensure the comparison days belong to the same group (e.g., Mon-Thu).
@@ -29,7 +30,7 @@ def find_nearest_comparison_days(target_date, historical_data, group, weekday_gr
 
 	return nearest_days
 
-def apply_holiday_map(date, holiday_map):
+def apply_holiday_map(date: pd.Timestamp, holiday_map: Optional[Dict[pd.Timestamp, int]]) -> int:
 	"""
 	Apply holiday map to treat special days as a different weekday.
 	"""
@@ -37,16 +38,16 @@ def apply_holiday_map(date, holiday_map):
 		return holiday_map[date]
 	return date.weekday()
 
-def get_weekday_group(weekday, weekday_groups):
+def get_weekday_group(weekday: int, weekday_groups: Dict[str, List[int]]) -> str:
 	"""
 	Return the group label based on the supplied weekday groupings.
 	"""
 	for group, days in weekday_groups.items():
 		if weekday in days:
 			return group
-	return None
+	raise ValueError(f'weekday {weekday} not in {weekday_groups}')
 
-def predict_next_year(file_paths, prediction_period, weekday_groups, freq, holiday_map=None):
+def predict_next_year(file_paths: List[str], prediction_period: Tuple[str, str], weekday_groups: Dict[str, List[int]], freq: str, holiday_map: Optional[Dict[pd.Timestamp, int]] = None) -> pd.DataFrame:
 	"""
 	Predict the next year's values based on the historical data and supplied parameters.
 
